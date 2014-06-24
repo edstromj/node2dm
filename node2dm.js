@@ -327,6 +327,38 @@ function GCMConnection(config, apiKey, statKey, alternateEndpoint) {
     var totalErrors = 0;
     var startupTime = Math.round(Date.now() / 1000);
 
+    if (config.serverCallbackHost && config.serverCallbackPath) {
+        this.on('badregistration', function(pushData) {
+            // default to https
+            var protocol = (config.serverCallbackProtocol == 'http' ? 'http' : 'https');
+            var port = (config.serverCallbackPort || (config.serverCallbackProtocol == 'http' ? 80 : 443));
+            var postBody = {
+                device_token: pushData.deviceToken,
+                message_body: pushData.notification,
+                shared_secret: config.serverCallbackSharedSecret
+            }
+
+            var requestOptions = {
+                url: protocol + '://' + config.serverCallbackHost + ':' + port + config.serverCallbackPath,
+                form: postBody,
+                timeout: config.timeout,
+            }
+
+            if (config.serverCallbackProxy) {
+                requestOptions['proxy'] = config.serverCallbackProxy;
+            }
+
+            request.post(requestOptions, function(error, response, body) {
+                if (error) {
+                    writeStat('callback.error');
+                    log('Callback error: ' + error);
+                } else {
+                    writeStat('callback.success');
+                }
+            });
+        });
+    }
+
     this.notifyDevice = function(pushData) {
         var message = new gcm.Message({
             collapseKey: pushData.collapseKey,
@@ -350,9 +382,11 @@ function GCMConnection(config, apiKey, statKey, alternateEndpoint) {
                     if (r.error) {
                         if (r.error == "NotRegistered") {
                             writeStat(self.statKey + "not_registered");
+                            self.emit('badregistration', pushData);
                             return;
                         } else if (r.error == "InvalidRegistration") {
                             writeStat(self.statKey + "invalid_registration");
+                            self.emit('badregistration', pushData);
                             return;
                         } else {
                             log(r.error);
@@ -408,7 +442,7 @@ function GCMConnection(config, apiKey, statKey, alternateEndpoint) {
     this.debugServer.listen(config.debugServerPort + gUpperPortsUsed || config.port + 100 * gUpperPortsUsed);
     gUpperPortsUsed++;
 }
-
+util.inherits(GCMConnection, emitter);
 
 
 function C2DMConnection(config) {
