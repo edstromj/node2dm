@@ -330,8 +330,8 @@ function GCMConnection(config, apiKey, statKey, alternateEndpoint) {
     if (config.serverCallbackHost && config.serverCallbackPath) {
         this.on('badregistration', function(pushData) {
             // default to https
-            var protocol = (config.serverCallbackProtocol == 'http' ? 'http' : 'https');
-            var port = (config.serverCallbackPort || (config.serverCallbackProtocol == 'http' ? 80 : 443));
+            var protocol = 'https';
+            var port = (config.serverCallbackPort || 443);
             var postBody = {
                 device_token: pushData.deviceToken,
                 message_body: pushData.notification,
